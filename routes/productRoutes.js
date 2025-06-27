@@ -1,51 +1,73 @@
 const express = require("express");
 const router = express.Router();
 const Product = require("../models/Product");
-const cloudinary = require("../config/cloudinary");
-const upload = require("../middlewares/upload");
 
-// POST with image upload
-router.post("/", upload.single("image"), async (req, res) => {
+// CREATE: POST - receives image URL from frontend (already uploaded to Cloudinary)
+router.post("/", async (req, res) => {
     try {
-        let imageUrl = "";
+        const { name, category, price, stock, description, status, image } = req.body;
 
-        if (req.file) {
-            const result = await new Promise((resolve, reject) => {
-                const stream = cloudinary.uploader.upload_stream(
-                    { folder: "funk" },
-                    (error, result) => {
-                        if (error) reject(error);
-                        else resolve(result);
-                    }
-                );
-                stream.end(req.file.buffer);
-            });
-            imageUrl = result.secure_url;
+        // Basic validation
+        if (!name || !price || !stock || !image) {
+            return res.status(400).json({ message: "Missing required fields" });
         }
 
         const product = new Product({
-            name: req.body.name,
-            category: req.body.category,
-            price: req.body.price,
-            stock: req.body.stock,
-            status: req.body.status,
-            image: imageUrl, // ✅ save image URL
+            name,
+            category,
+            price,
+            stock,
+            description,
+            status,
+            image,
         });
 
         const saved = await product.save();
         res.status(201).json(saved);
     } catch (err) {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ message: err.message });
     }
 });
 
-// GET all products
+// READ: Get all products
 router.get("/", async (req, res) => {
     try {
         const products = await Product.find();
         res.json(products);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// READ: Get product by ID
+router.get("/:id", async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) return res.status(404).json({ message: "Product not found" });
+        res.json(product);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// UPDATE product
+router.put("/:id", async (req, res) => {
+    try {
+        const updated = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(updated);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// DELETE product
+router.delete("/:id", async (req, res) => {
+    try {
+        const deletedProduct = await Product.findByIdAndDelete(req.params.id);
+        if (!deletedProduct) return res.status(404).json({ message: "Product not found" });
+        res.json({ message: "Product deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
     }
 });
 
